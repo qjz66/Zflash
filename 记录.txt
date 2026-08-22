@@ -1,0 +1,2 @@
+1. 可以通过用户ip是否变化拦截用户请求，如果变化则需要再次登录，feign接口直接跳过校验
+2. 微服务秒杀框架：nginx代理+spring cloud、nacos服务发现+ 微服务+canal读取Binlog刷新reids+Mybatis操作数据库+RabbitMQ异步写日志

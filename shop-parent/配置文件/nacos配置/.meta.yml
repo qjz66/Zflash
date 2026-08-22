@@ -1,0 +1,37 @@
+configMetadataList:
+  - group: DEFAULT_GROUP
+    dataId: api-gateway-dev.yaml
+    type: yaml
+  - group: DEFAULT_GROUP
+    dataId: uaa-service-dev.yaml
+    type: yaml
+  - group: DEFAULT_GROUP
+    dataId: redis-config-dev.yaml
+    type: yaml
+  - group: DEFAULT_GROUP
+    dataId: rocketmq-config-dev.yaml
+    type: yaml
+  - group: DEFAULT_GROUP
+    dataId: product-service-dev.yaml
+    type: yaml
+  - group: DEFAULT_GROUP
+    dataId: seckill-service-dev.yaml
+    type: yaml
+  - group: DEFAULT_GROUP
+    dataId: intergral-service-dev.yaml
+    type: yaml
+  - group: DEFAULT_GROUP
+    dataId: job-service-dev.yaml
+    type: yaml
+  - group: DEFAULT_GROUP
+    dataId: websocket-service-dev.yaml
+    type: yaml
+  - group: DEFAULT_GROUP
+    dataId: pay-service-dev.yaml
+    type: yaml
+  - group: DEFAULT_GROUP
+    dataId: nacos-discovery-config-dev.yaml
+    type: yaml
+  - group: DEFAULT_GROUP
+    dataId: canal-service-dev.yaml
+    type: yaml
