@@ -3,6 +3,9 @@ package cn.wolfcode.mapper;
 import cn.wolfcode.common.domain.UserInfo;
 import cn.wolfcode.domain.LoginLog;
 import cn.wolfcode.domain.UserLogin;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.Date;
 
 /**
  * Created by wolfcode
@@ -28,4 +31,14 @@ public interface UserMapper {
      * @return
      */
     int insertLoginLong(LoginLog loginLog);
+
+    /**
+     * 插入用户登录信息
+     */
+    int insertUserLogin(@Param("phone") Long phone, @Param("password") String password, @Param("salt") String salt);
+
+    /**
+     * 插入用户基础信息
+     */
+    int insertUserInfo(@Param("phone") Long phone, @Param("nickName") String nickName, @Param("head") String head, @Param("registerIp") String registerIp, @Param("registerTime") Date registerTime);
 }

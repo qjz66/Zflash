@@ -10,4 +10,11 @@
   <select id="selectUserInfoByPhone" resultType="cn.wolfcode.common.domain.UserInfo" >
     select * from t_user_info where phone = #{phone}
   </select>
+  <insert id="insertUserLogin">
+    insert into t_user_login(phone, password, salt) values(#{phone}, #{password}, #{salt})
+  </insert>
+  <insert id="insertUserInfo">
+    insert into t_user_info(phone, nickname, head, register_ip, register_time)
+    values(#{phone}, #{nickName}, #{head}, #{registerIp}, #{registerTime})
+  </insert>
 </mapper>

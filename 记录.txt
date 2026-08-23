@@ -1,2 +1,4 @@
 1. 可以通过用户ip是否变化拦截用户请求，如果变化则需要再次登录，feign接口直接跳过校验
 2. 微服务秒杀框架：nginx代理+spring cloud、nacos服务发现+ 微服务+canal读取Binlog刷新reids+Mybatis操作数据库+RabbitMQ异步写日志
+3.使用Elastic-Job进行定时秒杀预热，配合Twitter Snowflake算法生成分布式唯一订单id标识，使用自定义注解获取参数信息简化代码流程，redis存储秒杀商品
+4. 使用接口创建1000条用户数据并进行登录，将token存到本地文件中，使用Jmeter模拟用户并发请求进行压力测试

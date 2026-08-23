@@ -3,8 +3,11 @@ package cn.wolfcode.web.controller;
 import cn.wolfcode.common.constants.CommonConstants;
 import cn.wolfcode.common.domain.UserInfo;
 import cn.wolfcode.common.exception.BusinessException;
+import cn.wolfcode.common.web.CodeMsg;
+import cn.wolfcode.common.web.CommonCodeMsg;
 import cn.wolfcode.common.web.Result;
 import cn.wolfcode.common.web.anno.RequireLogin;
+import cn.wolfcode.common.web.resolver.RequestUser;
 import cn.wolfcode.domain.OrderInfo;
 import cn.wolfcode.domain.SeckillProductVo;
 import cn.wolfcode.mq.MQConstant;
@@ -22,6 +25,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Calendar;
+import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -56,72 +61,52 @@ public class OrderInfoController {
 
     @RequireLogin
     @PostMapping("/doSeckill")
-    public Result<String> doSeckill(@RequestHeader(CommonConstants.TOKEN_NAME) String token, Long seckillId, Integer time) {
-        // 1. 判断用户是否登陆
-        // 2. 判断参数是否合法
-        if (seckillId == null || time == null) {
-            throw new BusinessException(SeckillCodeMsg.OP_ERROR);
+    public Result<?> doseckill(Long seckillId, Integer time, @RequestUser UserInfo userInfo) {
+        // 1. 基于token查询用户信息
+        // 已经使用注解得到
+        // 2. 基于秒杀id + 场次查询秒杀商品对象
+        SeckillProductVo seckillProductVo = seckillProductService.findByIdAndTimeFromRedis(seckillId, time);
+        if(seckillProductVo == null) {
+            CodeMsg codeMsg = new CodeMsg();
+            codeMsg.setCode(500);
+            codeMsg.setMsg("[秒杀]秒杀商品查询失败...");
+            throw new BusinessException(codeMsg);
         }
 
-        /*
-         * 本地标识判断
-         *  */
-        Boolean stockOverFlag = STOCK_OVER_FLAG_MAP.get(seckillId);
-        if (stockOverFlag != null && stockOverFlag) {
-            throw new BusinessException(SeckillCodeMsg.SECKILL_STOCK_OVER);
+        // 3. 判断当前时间是否在秒杀时间范围内
+        boolean range = betweenSeckillTime(seckillProductVo);
+        if (false) {
+            throw new BusinessException(new CodeMsg(501, "[秒杀]当前活动尚未开始..."));
         }
+        // 4. 判断库存是否充足
+        if(seckillProductVo.getStockCount() <= 0) {
+            throw new BusinessException(new CodeMsg(501, "[秒杀]库存不足..."));
+        }
+        // 5. 判断用户是否已对同一商品下单
+        OrderInfo orderInfo = orderInfoService.selectByUserIdAndSecKillId(userInfo.getPhone(), seckillId);
+        if(orderInfo != null) {
+            throw new BusinessException(new CodeMsg(501, "[秒杀]不能重复下单该商品..."));
+        }
+        // 6. 创建订单，扣除库存，返回订单id
+        String orderNo =  orderInfoService.doSeckill(seckillProductVo, userInfo);
 
-        // 3. 基于秒杀商品 id 获取秒杀商品对象，如果对象不存在，也说明是非法操作
-        SeckillProductVo vo = seckillProductService.findByIdAndTimeFromRedis(seckillId, time);
-        if (vo == null) {
-            throw new BusinessException(SeckillCodeMsg.OP_ERROR);
-        }
-        // 4. 判断是否在活动时间范围内
-        /* TODO 完成以后打开注释 */
-        /*if (!DateUtil.isLegalTime(vo.getStartDate(), time)) {
-            throw new BusinessException(SeckillCodeMsg.OVER_TIME_ERROR);
-        }*/
-        // 5. 判断库存是否 > 0
-        /*if (vo.getStockCount() <= 0) {
-            throw new BusinessException(SeckillCodeMsg.SECKILL_STOCK_OVER);
-        }*/
-        String stockCountRealKey = SeckillRedisKey.SECKILL_STOCK_COUNT_HASH.getRealKey(time + "");
-        /* 返回剩余的库存数量 */
-        Long remainStockCount = redisTemplate.opsForHash().increment(stockCountRealKey, vo.getId() + "", -1);
-        if (remainStockCount < 0) {
-            /* 只要当前库存是不足的，都往 map 中存储 */
-            STOCK_OVER_FLAG_MAP.put(seckillId, true);
-            throw new BusinessException(SeckillCodeMsg.SECKILL_STOCK_OVER);
-        }
-        // 6. 判断用户是否重复下单
-        UserInfo user = UserUtil.getUser(redisTemplate, token);
-        /*String realKey = SeckillRedisKey.SECKILL_ORDER_SET.getRealKey(time + "");
-        Boolean isMember = redisTemplate.opsForSet().isMember(realKey, user.getPhone() + ":" + seckillId);*/
-        String seckillOrderKey = SeckillRedisKey.SECKILL_ORDER_HASH.getRealKey(time + "");
-        String userOrderHashKey = user.getPhone() + ":" + seckillId;
-        /* 如果之前用户没有下过单，才能够 put 成功，结果会返回 true */
-        Boolean putIfAbsent = redisTemplate.opsForHash().putIfAbsent(seckillOrderKey, userOrderHashKey, "1");
-        /* 如果结果为 false，说明用户已经下过单了 */
-        if (!putIfAbsent) {
-            // 说明已经下过单
-            throw new BusinessException(SeckillCodeMsg.REPEAT_SECKILL);
-        }
-        // 7. 开始秒杀流程，减库存、创建秒杀订单、存储下单成功标识，返回订单编号
-        // String orderNo = orderInfoService.doSeckill(vo, user);
-        // 异步发送下单消息
-        OrderMessage message = new OrderMessage(time, seckillId, token, user.getPhone());
-        rocketMQTemplate.asyncSend(MQConstant.ORDER_PENDING_TOPIC, message, new SendCallback() {
-            @Override
-            public void onSuccess(SendResult sendResult) {
-                log.info("[秒杀下单] 发送下单消息成功：status={}, messageId={}", sendResult.getSendStatus(), sendResult.getMsgId());
-                log.info("[秒杀下单] 消息内容：{}", message.toString());
-            }
-
-            @Override
-            public void onException(Throwable throwable) {
-                log.error("[秒杀下单] 发送下单消息失败：", throwable);
-            }
-        });
-        return Result.success("正在下单中，请稍后");
+        return Result.success(orderNo);
     }
+
+    private boolean betweenSeckillTime(SeckillProductVo seckillProductVo) {
+        Calendar instance = Calendar.getInstance();
+        instance.setTime(seckillProductVo.getStartDate());
+        instance.set(Calendar.HOUR_OF_DAY, seckillProductVo.getTime());
+
+        // 获取开始时间
+        Date startTime = instance.getTime();
+        // 获取结束时间
+        instance.add(Calendar.HOUR_OF_DAY, 2);
+        Date endTime = instance.getTime();
+
+        //当前时间
+        long now = System.currentTimeMillis();
+        return now >= startTime.getTime() && now < endTime.getTime();
+    }
+
 }

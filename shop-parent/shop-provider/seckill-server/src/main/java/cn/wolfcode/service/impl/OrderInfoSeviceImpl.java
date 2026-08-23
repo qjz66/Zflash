@@ -292,6 +292,11 @@ public class OrderInfoSeviceImpl implements IOrderInfoService {
 //                new SeckillPendingOrderMessageListener.SendResultMessageCallback(vo.toString()));
     }
 
+    @Override
+    public OrderInfo selectByUserIdAndSecKillId(Long phone, Long seckillId) {
+        return orderInfoMapper.selectByUserIdAndSecKillId(phone,seckillId);
+    }
+
     private void addRefundLog(OrderInfo orderInfo, String reason) {
         RefundLog refundLog = new RefundLog();
         refundLog.setOutTradeNo(orderInfo.getOrderNo());

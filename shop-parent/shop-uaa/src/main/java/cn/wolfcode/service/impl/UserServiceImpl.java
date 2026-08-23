@@ -87,6 +87,25 @@ public class UserServiceImpl implements IUserService {
         return new UserResponse(token, userInfo);
     }
 
+    @Override
+    public String registerAndCreateToken(Long phone, String password, String ip) {
+        // 测试用户统一固定盐 + 默认密码，方便 JMeter 复用
+        String salt = "1a2b3c4d5e";
+        String encodedPwd = MD5Util.encode(password, salt);
+        // 已存在的用户跳过创建，直接生成 token（保证接口可重复调用）
+        if (userMapper.selectUserLoginByPhone(phone) == null) {
+            userMapper.insertUserLogin(phone, encodedPwd, salt);
+            String nickName = "test" + phone;
+            userMapper.insertUserInfo(phone, nickName, "1.jpg", ip, new Date());
+        }
+        UserInfo userInfo = new UserInfo();
+        userInfo.setPhone(phone);
+        userInfo.setNickName("test" + phone);
+        userInfo.setHeead("1.jpg");
+        userInfo.setLoginIp(ip);
+        return createToken(userInfo);
+    }
+
     private String createToken(UserInfo userInfo) {
         //token创建
         String token = UUID.randomUUID().toString().replace("-", "");

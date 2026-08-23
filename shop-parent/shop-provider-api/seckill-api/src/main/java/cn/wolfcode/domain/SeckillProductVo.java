@@ -18,5 +18,5 @@ public class SeckillProductVo extends SeckillProduct implements Serializable {
     private String productImg;
     private String productDetail;
     private BigDecimal productPrice;
-    private Integer currentCount;
+    private Integer stockCount;
 }

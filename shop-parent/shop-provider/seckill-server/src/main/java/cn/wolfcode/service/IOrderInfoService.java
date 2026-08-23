@@ -76,4 +76,7 @@ public interface IOrderInfoService {
      * @param orderNo
      */
     void intergralPay(String orderNo);
+
+    OrderInfo selectByUserIdAndSecKillId(Long phone, Long seckillId);
+
 }
