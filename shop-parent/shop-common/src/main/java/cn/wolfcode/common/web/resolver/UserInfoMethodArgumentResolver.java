@@ -1,0 +1,33 @@
+package cn.wolfcode.common.web.resolver;
+
+import cn.wolfcode.common.domain.UserInfo;
+import cn.wolfcode.redis.CommonRedisKey;
+import com.alibaba.fastjson.JSON;
+import org.checkerframework.checker.nullness.qual.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.MethodParameter;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Component;
+import org.springframework.web.bind.support.WebDataBinderFactory;
+import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
+import org.springframework.web.method.support.ModelAndViewContainer;
+
+public class UserInfoMethodArgumentResolver implements HandlerMethodArgumentResolver {
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+
+    @Override
+    public boolean supportsParameter(MethodParameter methodParameter) {
+        return methodParameter.hasParameterAnnotation(RequestUser.class) &&
+                methodParameter.getParameterType() == UserInfo.class;
+    }
+
+    @Override
+    public @Nullable Object resolveArgument(MethodParameter methodParameter, @Nullable ModelAndViewContainer modelAndViewContainer, NativeWebRequest nativeWebRequest, @Nullable WebDataBinderFactory webDataBinderFactory) throws Exception {
+        // 1.从请求头获取token
+        String token = nativeWebRequest.getHeader("token");
+        return JSON.parseObject(redisTemplate.opsForValue().get(CommonRedisKey.USER_TOKEN.getRealKey(token)), UserInfo.class);
+    }
+}
