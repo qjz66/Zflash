@@ -9,6 +9,7 @@ import java.util.List;
 
 @Repository
 public interface SeckillProductMapper {
+
     /**
      * 根据time时间场次查询对应的秒杀商品集合
      *

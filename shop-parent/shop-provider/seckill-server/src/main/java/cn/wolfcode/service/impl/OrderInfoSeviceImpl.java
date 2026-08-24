@@ -2,6 +2,7 @@ package cn.wolfcode.service.impl;
 
 import cn.wolfcode.common.domain.UserInfo;
 import cn.wolfcode.common.exception.BusinessException;
+import cn.wolfcode.common.web.CodeMsg;
 import cn.wolfcode.common.web.Result;
 import cn.wolfcode.domain.*;
 import cn.wolfcode.feign.AlipayFeignApi;
@@ -9,6 +10,7 @@ import cn.wolfcode.feign.IntergralFeignApi;
 import cn.wolfcode.mapper.OrderInfoMapper;
 import cn.wolfcode.mapper.PayLogMapper;
 import cn.wolfcode.mapper.RefundLogMapper;
+import cn.wolfcode.mapper.SeckillProductMapper;
 import cn.wolfcode.mq.MQConstant;
 import cn.wolfcode.mq.TimeoutOrder;
 import cn.wolfcode.mq.listener.SeckillPendingOrderMessageListener;
@@ -62,7 +64,7 @@ public class OrderInfoSeviceImpl implements IOrderInfoService {
     @Transactional(rollbackFor = Exception.class)
     @Override
     public String doSeckill(SeckillProductVo vo, UserInfo user) {
-        // 1. 扣库存（redis、MySQL）
+        // 1. 查库存再扣库存（redis、MySQL）
         seckillProductService.decrStockCount(vo);
         // 2. 生成秒杀订单
         String orderNo = this.createOrder(vo, user);

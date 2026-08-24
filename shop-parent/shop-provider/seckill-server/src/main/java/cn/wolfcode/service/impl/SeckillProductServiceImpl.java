@@ -1,6 +1,7 @@
 package cn.wolfcode.service.impl;
 
 import cn.wolfcode.common.exception.BusinessException;
+import cn.wolfcode.common.web.CodeMsg;
 import cn.wolfcode.common.web.CommonCodeMsg;
 import cn.wolfcode.common.web.Result;
 import cn.wolfcode.domain.Product;
@@ -10,6 +11,7 @@ import cn.wolfcode.feign.ProductFeignApi;
 import cn.wolfcode.mapper.SeckillProductMapper;
 import cn.wolfcode.redis.SeckillRedisKey;
 import cn.wolfcode.service.ISeckillProductService;
+import cn.wolfcode.util.IdGenerateUtil;
 import cn.wolfcode.web.msg.SeckillCodeMsg;
 import com.alibaba.fastjson.JSON;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +19,7 @@ import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -35,6 +38,8 @@ public class SeckillProductServiceImpl implements ISeckillProductService {
     private RocketMQTemplate rocketMQTemplate;
     @Autowired
     private ProductFeignApi productFeignApi;
+    @Autowired
+    private RedisScript<Boolean> redisScript;
 
     @Override
     public List<SeckillProductVo> selectByTime(Integer time) {
@@ -231,17 +236,46 @@ public class SeckillProductServiceImpl implements ISeckillProductService {
 
     @Override
     public void decrStockCount(SeckillProductVo vo) {
-        // 先扣除 MySQL 库存
-        int ret = seckillProductMapper.decrStock(vo.getId());
-        if (ret > 0) {
-            // 扣除 redis 库存
-            vo.setStockCount(vo.getStockCount() - 1);
-            String realKey = SeckillRedisKey.SECKILL_PRODUCT_LIST.getRealKey(vo.getTime() + "");
-            redisTemplate.opsForHash().put(realKey, vo.getId() + "", JSON.toJSONString(vo));
-        } else {
-            // 乐观锁生效
-            throw new BusinessException(SeckillCodeMsg.SECKILL_STOCK_OVER);
+        String key = "seckill:product:stockcount:" + vo.getTime() + ":" + vo.getId();
+        String threadId = IdGenerateUtil.get().nextId()+"";
+        try {
+            // 尝试获取锁
+            int count = 0;
+            do {
+                Boolean res = redisTemplate.execute(redisScript, Collections.singletonList(key), threadId, "10");
+                if(res) {
+                    break;
+                }
+
+                if((count++) > 5) {
+                    throw new BusinessException(new CodeMsg(501,"[秒杀]减库存失败..."));
+                }
+                Thread.sleep(10);
+            }while (true);
+
+            // 查库存先扣除 MySQL 库存
+            int ret = seckillProductMapper.decrStock(vo.getId());
+            if (ret > 0) {
+                // 扣除 redis 库存
+                vo.setStockCount(vo.getStockCount() - 1);
+                String realKey = SeckillRedisKey.SECKILL_PRODUCT_LIST.getRealKey(vo.getTime() + "");
+                redisTemplate.opsForHash().put(realKey, vo.getId() + "", JSON.toJSONString(vo));
+            } else {
+                // 乐观锁生效
+                throw new BusinessException(SeckillCodeMsg.SECKILL_STOCK_OVER);
+            }
+        } catch (BusinessException e) {
+            throw e;                       // 业务异常原样抛出，ControllerAdvice 会返回"您来晚了"
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        } finally {
+            String value = redisTemplate.opsForValue().get(key);
+            if(threadId.equals(value)) {
+                redisTemplate.delete(key);
+            }
+
         }
+
     }
 
     @Override
