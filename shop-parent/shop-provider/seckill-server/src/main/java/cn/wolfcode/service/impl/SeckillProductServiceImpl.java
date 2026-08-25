@@ -23,6 +23,8 @@ import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 
@@ -40,6 +42,8 @@ public class SeckillProductServiceImpl implements ISeckillProductService {
     private ProductFeignApi productFeignApi;
     @Autowired
     private RedisScript<Boolean> redisScript;
+    @Autowired
+    private ScheduledExecutorService scheduledExecutorService;
 
     @Override
     public List<SeckillProductVo> selectByTime(Integer time) {
@@ -238,6 +242,7 @@ public class SeckillProductServiceImpl implements ISeckillProductService {
     public void decrStockCount(SeckillProductVo vo) {
         String key = "seckill:product:stockcount:" + vo.getTime() + ":" + vo.getId();
         String threadId = IdGenerateUtil.get().nextId()+"";
+        ScheduledFuture<?> future = null;
         try {
             // 尝试获取锁
             int count = 0;
@@ -252,6 +257,21 @@ public class SeckillProductServiceImpl implements ISeckillProductService {
                 }
                 Thread.sleep(10);
             }while (true);
+
+            // 加锁成功 开启线程进行监听
+            future = scheduledExecutorService.scheduleAtFixedRate(
+                    ()->{
+                        // 检查键是否存在
+                        String value = redisTemplate.opsForValue().get(key);
+                        if (threadId.equals(value)) {
+                            redisTemplate.expire(key,10, TimeUnit.SECONDS);
+                            return;
+                        }
+                    },
+                    8,
+                    8,
+                    TimeUnit.SECONDS
+            );
 
             // 查库存先扣除 MySQL 库存
             int ret = seckillProductMapper.decrStock(vo.getId());
@@ -272,6 +292,10 @@ public class SeckillProductServiceImpl implements ISeckillProductService {
             String value = redisTemplate.opsForValue().get(key);
             if(threadId.equals(value)) {
                 redisTemplate.delete(key);
+                if (future != null) {
+                    future.cancel(true);
+                }
+
             }
 
         }
