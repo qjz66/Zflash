@@ -239,6 +239,22 @@ public class SeckillProductServiceImpl implements ISeckillProductService {
     }
 
     @Override
+    public void decrStockCount(Long id, Integer time) {
+        int ret = seckillProductMapper.decrStock(id);
+        if (ret > 0) {
+            // 扣除 redis 库存
+            //String realKey = SeckillRedisKey.SECKILL_PRODUCT_LIST.getRealKey(time + ":"+id);
+            //String stockCount = redisTemplate.opsForHash().get(realKey,"stockCount").toString();
+            //SeckillProductVo vo = JSON.parseObject(value, SeckillProductVo.class);
+            //vo.setStockCount(vo.getStockCount()-1);
+            //redisTemplate.opsForHash().put(realKey, "stockCount", stockCount);
+        } else {
+            // 乐观锁生效
+            throw new BusinessException(SeckillCodeMsg.SECKILL_STOCK_OVER);
+        }
+    }
+
+    @Override
     public void decrStockCount(SeckillProductVo vo) {
         String key = "seckill:product:stockcount:" + vo.getTime() + ":" + vo.getId();
         String threadId = IdGenerateUtil.get().nextId()+"";
@@ -255,7 +271,7 @@ public class SeckillProductServiceImpl implements ISeckillProductService {
                 if((count++) > 5) {
                     throw new BusinessException(new CodeMsg(501,"[秒杀]减库存失败..."));
                 }
-                Thread.sleep(10);
+                Thread.sleep(20);
             }while (true);
 
             // 加锁成功 开启线程进行监听

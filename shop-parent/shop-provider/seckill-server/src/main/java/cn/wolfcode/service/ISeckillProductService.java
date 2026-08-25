@@ -33,6 +33,8 @@ public interface ISeckillProductService {
      */
     SeckillProductVo findByIdAndTimeFromRedis(Long seckillId, Integer time);
 
+    void decrStockCount(Long id, Integer time);
+
     /**
      * 扣秒杀商品库存
      *

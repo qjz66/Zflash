@@ -65,7 +65,7 @@ public class OrderInfoSeviceImpl implements IOrderInfoService {
     @Override
     public String doSeckill(SeckillProductVo vo, UserInfo user) {
         // 1. 查库存再扣库存（redis、MySQL）
-        seckillProductService.decrStockCount(vo);
+        seckillProductService.decrStockCount(vo.getId(), vo.getTime());
         // 2. 生成秒杀订单
         String orderNo = this.createOrder(vo, user);
         // 3. 记录用户下单成功标识

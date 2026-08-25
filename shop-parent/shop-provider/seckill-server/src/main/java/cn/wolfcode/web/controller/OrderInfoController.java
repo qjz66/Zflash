@@ -62,6 +62,12 @@ public class OrderInfoController {
     @RequireLogin
     @PostMapping("/doSeckill")
     public Result<?> doseckill(Long seckillId, Integer time, @RequestUser UserInfo userInfo) {
+        // 基于售完标识判断该商品是否已经售罄
+        Boolean flag = STOCK_OVER_FLAG_MAP.get(seckillId);
+        if(flag != null && flag == true) {
+            return Result.error(SeckillCodeMsg.SECKILL_STOCK_OVER);
+        }
+
         // 1. 基于token查询用户信息
         // 已经使用注解得到
         // 2. 基于秒杀id + 场次查询秒杀商品对象
@@ -78,15 +84,22 @@ public class OrderInfoController {
         if (false) {
             throw new BusinessException(new CodeMsg(501, "[秒杀]当前活动尚未开始..."));
         }
-        // 4. 判断库存是否充足
-        if(seckillProductVo.getStockCount() <= 0) {
-            throw new BusinessException(new CodeMsg(501, "[秒杀]库存不足..."));
-        }
-        // 5. 判断用户是否已对同一商品下单
-        OrderInfo orderInfo = orderInfoService.selectByUserIdAndSecKillId(userInfo.getPhone(), seckillId);
-        if(orderInfo != null) {
+
+        // 5. 判断用户是否已对同一商品下单 使用redis increment进行判断
+        String orderKey = SeckillRedisKey.SECKILL_ORDER_HASH.getRealKey(time+":"+seckillId);
+        Long res = redisTemplate.opsForHash().increment(orderKey, userInfo.getPhone()+"",1);
+        if (res > 1) {
             throw new BusinessException(new CodeMsg(501, "[秒杀]不能重复下单该商品..."));
         }
+        // 4. 判断库存是否充足
+        // 使用redis中的stockCount进行判断 原子性自减操作
+        String hashKey = SeckillRedisKey.SECKILL_STOCK_COUNT_HASH.getRealKey(time+"");
+        Long res1 = redisTemplate.opsForHash().increment(hashKey, seckillId+"", -1);
+        if(res1 < 0) {
+            STOCK_OVER_FLAG_MAP.put(seckillId, true);
+            throw new BusinessException(new CodeMsg(501, "[秒杀]库存不足..."));
+        }
+
         // 6. 创建订单，扣除库存，返回订单id
         String orderNo =  orderInfoService.doSeckill(seckillProductVo, userInfo);
 
