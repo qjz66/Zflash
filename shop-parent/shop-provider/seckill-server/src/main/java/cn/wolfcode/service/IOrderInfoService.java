@@ -5,15 +5,18 @@ import cn.wolfcode.common.domain.UserInfo;
 import cn.wolfcode.domain.OrderInfo;
 import cn.wolfcode.domain.SeckillProductVo;
 import cn.wolfcode.mq.TimeoutOrder;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Created by wolfcode
  */
 public interface IOrderInfoService {
 
-    String doSeckill(SeckillProductVo vo, UserInfo user);
+    @Transactional(rollbackFor = Exception.class)
+    String doSeckill(SeckillProductVo vo, Long phone);
 
-    String doSeckill(Integer time, Long seckillId, String token);
+    @Transactional(rollbackFor = Exception.class)
+    String doSeckill(Integer time, Long seckillId, Long phone);
 
     /**
      * 秒杀商品 redis 回滚

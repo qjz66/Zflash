@@ -1,8 +1,6 @@
 package cn.wolfcode.service.impl;
 
-import cn.wolfcode.common.domain.UserInfo;
 import cn.wolfcode.common.exception.BusinessException;
-import cn.wolfcode.common.web.CodeMsg;
 import cn.wolfcode.common.web.Result;
 import cn.wolfcode.domain.*;
 import cn.wolfcode.feign.AlipayFeignApi;
@@ -10,7 +8,6 @@ import cn.wolfcode.feign.IntergralFeignApi;
 import cn.wolfcode.mapper.OrderInfoMapper;
 import cn.wolfcode.mapper.PayLogMapper;
 import cn.wolfcode.mapper.RefundLogMapper;
-import cn.wolfcode.mapper.SeckillProductMapper;
 import cn.wolfcode.mq.MQConstant;
 import cn.wolfcode.mq.TimeoutOrder;
 import cn.wolfcode.mq.listener.SeckillPendingOrderMessageListener;
@@ -18,7 +15,6 @@ import cn.wolfcode.redis.SeckillRedisKey;
 import cn.wolfcode.service.IOrderInfoService;
 import cn.wolfcode.service.ISeckillProductService;
 import cn.wolfcode.util.IdGenerateUtil;
-import cn.wolfcode.util.UserUtil;
 import cn.wolfcode.web.msg.SeckillCodeMsg;
 import com.alibaba.fastjson.JSON;
 import io.seata.core.context.RootContext;
@@ -63,11 +59,11 @@ public class OrderInfoSeviceImpl implements IOrderInfoService {
 
     @Transactional(rollbackFor = Exception.class)
     @Override
-    public String doSeckill(SeckillProductVo vo, UserInfo user) {
+    public String doSeckill(SeckillProductVo vo, Long phone) {
         // 1. 查库存再扣库存（redis、MySQL）
         seckillProductService.decrStockCount(vo.getId(), vo.getTime());
         // 2. 生成秒杀订单
-        String orderNo = this.createOrder(vo, user);
+        String orderNo = this.createOrder(vo, phone);
         // 3. 记录用户下单成功标识
         /*String realKey = SeckillRedisKey.SECKILL_ORDER_SET.getRealKey(vo.getTime() + "");
         redisTemplate.opsForSet().add(realKey, user.getPhone() + ":" + vo.getId());*/
@@ -76,10 +72,10 @@ public class OrderInfoSeviceImpl implements IOrderInfoService {
 
     @Transactional(rollbackFor = Exception.class)
     @Override
-    public String doSeckill(Integer time, Long seckillId, String token) {
+    public String doSeckill(Integer time, Long seckillId, Long phone) {
         SeckillProductVo vo = seckillProductService.findByIdAndTimeFromRedis(seckillId, time);
-        UserInfo user = UserUtil.getUser(redisTemplate, token);
-        return doSeckill(vo, user);
+        //UserInfo user = UserUtil.getUser(redisTemplate, token);
+        return doSeckill(vo, phone);
     }
 
     @Override
@@ -325,7 +321,7 @@ public class OrderInfoSeviceImpl implements IOrderInfoService {
         return payVo;
     }
 
-    private String createOrder(SeckillProductVo vo, UserInfo user) {
+    private String createOrder(SeckillProductVo vo, Long phone) {
         Date now = new Date();
         OrderInfo orderInfo = new OrderInfo();
         orderInfo.setCreateDate(now);
@@ -341,7 +337,7 @@ public class OrderInfoSeviceImpl implements IOrderInfoService {
         orderInfo.setSeckillId(vo.getId());
         orderInfo.setSeckillPrice(vo.getSeckillPrice());
         orderInfo.setStatus(OrderInfo.STATUS_ARREARAGE);
-        orderInfo.setUserId(user.getPhone());
+        orderInfo.setUserId(phone);
         // 保存订单
         orderInfoMapper.insert(orderInfo);
         return orderNo;

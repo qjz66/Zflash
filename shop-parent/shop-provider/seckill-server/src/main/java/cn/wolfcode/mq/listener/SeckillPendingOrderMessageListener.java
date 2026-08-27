@@ -42,7 +42,7 @@ public class SeckillPendingOrderMessageListener implements RocketMQListener<Orde
             log.info("[秒杀订单消费者] 收到秒杀订单前置消息：{}", orderMessage.toString());
             log.info("[秒杀订单消费者] 准备开始创建订单-------------------------------------------");
             // 调用秒杀订单服务直接创建秒杀订单
-            String orderNo = orderInfoService.doSeckill(orderMessage.getTime(), orderMessage.getSeckillId(), orderMessage.getToken());
+            String orderNo = orderInfoService.doSeckill(orderMessage.getTime(), orderMessage.getSeckillId(), orderMessage.getUserPhone());
             log.info("[秒杀订单消费者] 订单编号：{}", orderNo);
             log.info("[秒杀订单消费者] 创建订单完成-------------------------------------------");
             // 创建订单成功
