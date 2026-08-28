@@ -32,7 +32,7 @@ function syncStatus(orderNo) {
 // 订单支付操作
 function startPayMent(orderNo) {
     ajaxHttp({
-        url: '/seckill/orderPay/alipay?orderNo=' + orderNo + '&type=' + priceType + ''
+        url: '/seckill/orderPay/pay?orderNo=' + orderNo + '&payType=' + priceType + ''
     }, (res) => {
         if (priceType == 0) {
             $("#pay").append(res.data);

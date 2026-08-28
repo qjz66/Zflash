@@ -161,20 +161,36 @@ public class OrderInfoSeviceImpl implements IOrderInfoService {
 
     @Override
     public String alipay(String orderNo) {
+        //OrderInfo orderInfo = this.findById(orderNo);
+        ///* 如果查询不到订单，或者订单状态不为未支付，都抛出操作异常 */
+        //if (orderInfo == null || !OrderInfo.STATUS_ARREARAGE.equals(orderInfo.getStatus())) {
+        //    throw new BusinessException(SeckillCodeMsg.OP_ERROR);
+        //}
+        //// 封装 支付对象
+        //PayVo pay = this.buildPayVo(orderInfo);
+        //// 调用支付服务接口进行支付
+        //Result<String> result = alipayFeignApi.pay(pay);
+        //if (result == null || result.hasError()) {
+        //    throw new BusinessException(SeckillCodeMsg.PAY_FAILED_ERROR);
+        //}
+        //// 返回发起支付结果
+        //return result.getData();
+        // 1.基于订单号查询订单对象
         OrderInfo orderInfo = this.findById(orderNo);
-        /* 如果查询不到订单，或者订单状态不为未支付，都抛出操作异常 */
+        // 2.验证订单状态是否为未支付
+
         if (orderInfo == null || !OrderInfo.STATUS_ARREARAGE.equals(orderInfo.getStatus())) {
             throw new BusinessException(SeckillCodeMsg.OP_ERROR);
+
         }
-        // 封装 支付对象
-        PayVo pay = this.buildPayVo(orderInfo);
-        // 调用支付服务接口进行支付
-        Result<String> result = alipayFeignApi.pay(pay);
-        if (result == null || result.hasError()) {
+        PayVo payVo = this.buildPayVo(orderInfo);
+        Result<String> res = alipayFeignApi.pay(payVo);
+
+        if(res == null || res.hasError()) {
             throw new BusinessException(SeckillCodeMsg.PAY_FAILED_ERROR);
         }
-        // 返回发起支付结果
-        return result.getData();
+
+        return res.getData();
     }
 
     @Override
@@ -305,18 +321,11 @@ public class OrderInfoSeviceImpl implements IOrderInfoService {
         this.refundLogMapper.insert(refundLog);
     }
 
-    @Value("${pay.returnUrl}")
-    private String returnUrl;
-    @Value("${pay.notifyUrl}")
-    private String notifyUrl;
-
     private PayVo buildPayVo(OrderInfo orderInfo) {
         PayVo payVo = new PayVo();
         payVo.setBody("秒杀商品：" + orderInfo.getProductName());
-        payVo.setNotifyUrl(notifyUrl);
-        payVo.setReturnUrl(returnUrl);
         payVo.setOutTradeNo(orderInfo.getOrderNo());
-        payVo.setSubject("叩丁狼秒杀商城订单");
+        payVo.setSubject(orderInfo.getProductName());
         payVo.setTotalAmount(orderInfo.getSeckillPrice() + "");
         return payVo;
     }

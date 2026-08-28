@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -22,6 +23,7 @@ import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 
 
 @Slf4j
@@ -47,52 +49,40 @@ public class OrderPayController {
         return Result.success("同步成功");
     }
 
-    @RequestMapping("/alipay")
-    public Result<String> pay(String orderNo, Integer type) {
-        // 1. 参数校验
-        if (!StringUtils.hasLength(orderNo) || type == null) {
-            throw new BusinessException(SeckillCodeMsg.OP_ERROR);
-        }
-        // 2. 判断类型，基于不同类型选择不同支付方式
-        if (OrderInfo.PAY_TYPE_ONLINE.equals(type)) {
-            // 支付宝支付
-            String result = orderInfoService.alipay(orderNo);
-            return Result.success(result);
-        } else if (OrderInfo.PAY_TYPE_INTERGRAL.equals(type)) {
-            // 积分支付
-            orderInfoService.intergralPay(orderNo);
-            return Result.success("积分支付成功");
-        }
+//    @RequestMapping("/alipay")
+//    public Result<String> pay(String orderNo, Integer type) {
+//        // 1. 参数校验
+//        if (!StringUtils.hasLength(orderNo) || type == null) {
+//            throw new BusinessException(SeckillCodeMsg.OP_ERROR);
+//        }
+//        // 2. 判断类型，基于不同类型选择不同支付方式
+//        if (OrderInfo.PAY_TYPE_ONLINE.equals(type)) {
+//            // 支付宝支付
+//            String result = orderInfoService.alipay(orderNo);
+//            return Result.success(result);
+//        } else if (OrderInfo.PAY_TYPE_INTERGRAL.equals(type)) {
+//            // 积分支付
+//            orderInfoService.intergralPay(orderNo);
+//            return Result.success("积分支付成功");
+//        }
+//
+//        // 不正常的类型
+//        throw new BusinessException(SeckillCodeMsg.OP_ERROR);
+//    }
 
-        // 不正常的类型
-        throw new BusinessException(SeckillCodeMsg.OP_ERROR);
+    @GetMapping("/pay")
+    public Result<String> dopay(String orderNo, Integer payType) {
+        if (Objects.equals(payType, OrderInfo.PAY_TYPE_ONLINE)) {
+            return Result.success(orderInfoService.alipay(orderNo));
+        }
+        return null;
     }
 
-    @Value("${pay.frontEndPayUrl}")
-    private String frontEndPayUrl;
 
     /**
      * 让页面重定向到指定页面
      */
-    @RequestMapping("/return_url")
-    public void returnUrl(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        Map<String, String> params = getParams(req);
-        log.info("[支付宝同步回调] 收到支付宝同步回调请求：params={}", params);
-        // 获取支付宝GET过来反馈信息
-        // 调用支付服务来进行验证签名，得到验证结果给
-        // boolean signVerified = AlipaySignature.rsaCheckV1(params, AlipayConfig.alipay_public_key, AlipayConfig.charset, AlipayConfig.sign_type); //调用SDK验证签名
-        Result<Boolean> result = alipayFeignApi.rsaCheckV1(params);
 
-        if (result == null || result.hasError() || !result.getData()) {
-            throw new BusinessException(SeckillCodeMsg.RSA_CHECK_FAILED);
-        }
-
-        //——请在这里编写您的程序（以下代码仅作参考）——
-        //商户订单号
-        String out_trade_no = params.get("out_trade_no");
-        // 重定向回订单详情页
-        resp.sendRedirect(frontEndPayUrl + out_trade_no);
-    }
 
     private Map<String, String> getParams(HttpServletRequest req) throws UnsupportedEncodingException {
         Map<String, String> params = new HashMap<String, String>();
