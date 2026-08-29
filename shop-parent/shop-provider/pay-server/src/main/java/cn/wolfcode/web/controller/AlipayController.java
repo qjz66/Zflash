@@ -3,24 +3,24 @@ package cn.wolfcode.web.controller;
 import cn.wolfcode.common.web.CodeMsg;
 import cn.wolfcode.common.web.Result;
 import cn.wolfcode.config.AlipayProperties;
+import cn.wolfcode.domain.PaySuccessVo;
 import cn.wolfcode.domain.PayVo;
-import cn.wolfcode.domain.RefundVo;
+import cn.wolfcode.feign.AliPaySuccessApi;
 import cn.wolfcode.web.msg.PayCodeMsg;
-import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alipay.api.AlipayApiException;
 import com.alipay.api.AlipayClient;
 import com.alipay.api.internal.util.AlipaySignature;
 import com.alipay.api.request.AlipayTradePagePayRequest;
-import com.alipay.api.request.AlipayTradeQueryRequest;
-import com.alipay.api.request.AlipayTradeRefundRequest;
 import com.alipay.api.response.AlipayTradePagePayResponse;
-import com.alipay.api.response.AlipayTradeRefundResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
+import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 
@@ -32,6 +32,8 @@ public class AlipayController {
     private AlipayClient alipayClient;
     @Autowired
     private AlipayProperties alipayProperties;
+    @Autowired
+    private AliPaySuccessApi aliPaySuccessApi;
 
 //    @RequestMapping("/queryTradeStatus")
 //    public Result<Map<String, String>> queryStatus(@RequestParam("orderNo") String orderNo) throws AlipayApiException {
@@ -163,5 +165,89 @@ public class AlipayController {
         }
 
         return Result.error(PayCodeMsg.PAY_FAILED);
+    }
+
+    @PostMapping("notify_url")
+    public String notifyUrl(HttpServletRequest req) throws UnsupportedEncodingException, AlipayApiException {
+        Map<String, String> params = getParams(req);
+        // 获取支付宝POST过来反馈信息
+        try{
+            boolean signVerified = AlipaySignature.rsaCheckV1(params, alipayProperties.getAlipayPublicKey(), alipayProperties.getCharset(), alipayProperties.getSignType()); //调用SDK验证签名
+            if (signVerified) {
+                //商户订单号
+                String orderNo = params.get("out_trade_no");
+                //支付宝交易号
+                String tradeNo = params.get("trade_no");
+                //交易状态
+                String trade_status = params.get("trade_status");
+                String totalAmount = params.get("total_amount");
+                log.info("[支付宝异步回调] 收到订单交易完成状态通知：{}", params);
+
+                if (trade_status.equals("TRADE_FINISHED")) {
+                    //判断该笔订单是否在商户网站中已经做过处理
+                    //如果没有做过处理，根据订单号（out_trade_no）在商户网站的订单系统中查到该笔订单的详细，并执行商户的业务程序
+                    //如果有做过处理，不执行商户的业务程序
+                    log.info("[支付宝异步回调] 收到订单交易完成状态通知：{}", params);
+                    //注意：
+                    //退款日期超过可退款期限后（如三个月可退款），支付宝系统发送该交易状态通知
+                } else if (trade_status.equals("TRADE_SUCCESS")) {
+                    //判断该笔订单是否在商户网站中已经做过处理
+                    //如果没有做过处理，根据订单号（out_trade_no）在商户网站的订单系统中查到该笔订单的详细，并执行商户的业务程序
+                    //如果有做过处理，不执行商户的业务程序
+                    PaySuccessVo paySuccessVo = new PaySuccessVo();
+                    paySuccessVo.setOutTradeNo(orderNo);
+                    paySuccessVo.setTradeNo(tradeNo);
+                    paySuccessVo.setTotalAmount(totalAmount);
+                    aliPaySuccessApi.paySuccess(paySuccessVo);
+
+                    //注意：
+                    //付款完成后，支付宝系统发送该交易状态通知
+                }
+            }
+
+            return "success";
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return "fail";
+    }
+
+    private Map<String, String> getParams(HttpServletRequest req) throws UnsupportedEncodingException {
+        Map<String, String> params = new HashMap<String, String>();
+        Map<String, String[]> requestParams = req.getParameterMap();
+        for (Iterator<String> iter = requestParams.keySet().iterator(); iter.hasNext(); ) {
+            String name = (String) iter.next();
+            String[] values = (String[]) requestParams.get(name);
+            String valueStr = "";
+            for (int i = 0; i < values.length; i++) {
+                valueStr = (i == values.length - 1) ? valueStr + values[i]
+                        : valueStr + values[i] + ",";
+            }
+            // 乱码解决，这段代码在出现乱码时使用
+            // valueStr = new String(valueStr.getBytes("ISO-8859-1"), "utf-8");
+            params.put(name, valueStr);
+        }
+        return params;
+    }
+
+    @GetMapping("/return_url")
+    public String returnUrl(HttpServletRequest req) throws UnsupportedEncodingException {
+        Map<String, String> params = getParams(req);
+
+        log.info("同步回调 收到交易消息{}", params);
+
+        try{
+            boolean signVerified = AlipaySignature.rsaCheckV1(params, alipayProperties.getAlipayPublicKey(), alipayProperties.getCharset(), alipayProperties.getSignType()); //调用SDK验证签名
+            if (signVerified) {
+                return "redirect:http://localhost/order_detail.html?orderNo=" + params.get("out_trade_no");
+            }
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return "fail";
     }
 }

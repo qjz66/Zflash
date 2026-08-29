@@ -1,6 +1,7 @@
 package cn.wolfcode.service.impl;
 
 import cn.wolfcode.common.exception.BusinessException;
+import cn.wolfcode.common.web.CodeMsg;
 import cn.wolfcode.common.web.Result;
 import cn.wolfcode.domain.*;
 import cn.wolfcode.feign.AlipayFeignApi;
@@ -29,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import javax.persistence.criteria.Order;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
@@ -198,9 +200,26 @@ public class OrderInfoSeviceImpl implements IOrderInfoService {
         // 保证幂等性
         // update t_order_info set status = success where orderNo = #{orderNo} and status = 0
         // 1. 修改订单状态
+        //int row = orderInfoMapper.changePayStatus(orderNo, OrderInfo.STATUS_ACCOUNT_PAID, OrderInfo.PAY_TYPE_ONLINE);
+        //if (row > 0) {
+        //    // 2. 增加支付流水记录
+        //    this.addPayLog(orderNo, OrderInfo.PAY_TYPE_ONLINE, totalAmount, tradeNo);
+        //}
+
+        // 1.查询订单对象 确保订单信息无错误
+        OrderInfo orderInfo = this.findById(orderNo);
+        if (orderInfo == null) {
+            throw new BusinessException(new CodeMsg(500601,"订单信息错误，查询为空..."));
+        }
+
+        // 2.判断订单金额
+        if(!orderInfo.getSeckillPrice().toString().equals(totalAmount)) {
+            throw new BusinessException(new CodeMsg(500601,"订单信息错误，金额不正确..."));
+        }
+
+        // 3.使用订单状态保证幂等性
         int row = orderInfoMapper.changePayStatus(orderNo, OrderInfo.STATUS_ACCOUNT_PAID, OrderInfo.PAY_TYPE_ONLINE);
         if (row > 0) {
-            // 2. 增加支付流水记录
             this.addPayLog(orderNo, OrderInfo.PAY_TYPE_ONLINE, totalAmount, tradeNo);
         }
     }

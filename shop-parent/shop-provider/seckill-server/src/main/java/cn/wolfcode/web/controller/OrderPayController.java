@@ -4,6 +4,7 @@ package cn.wolfcode.web.controller;
 import cn.wolfcode.common.exception.BusinessException;
 import cn.wolfcode.common.web.Result;
 import cn.wolfcode.domain.OrderInfo;
+import cn.wolfcode.domain.PaySuccessVo;
 import cn.wolfcode.feign.AlipayFeignApi;
 import cn.wolfcode.service.IOrderInfoService;
 import cn.wolfcode.web.msg.SeckillCodeMsg;
@@ -12,9 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -76,6 +75,12 @@ public class OrderPayController {
             return Result.success(orderInfoService.alipay(orderNo));
         }
         return null;
+    }
+
+    @PostMapping("paySuccess")
+    public Result<String> paySuccess(@RequestBody PaySuccessVo paySuccessVo) {
+        orderInfoService.paySuccess(paySuccessVo.getTotalAmount(), paySuccessVo.getTradeNo(), paySuccessVo.getOutTradeNo());
+        return Result.success("success");
     }
 
 

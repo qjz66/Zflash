@@ -28,16 +28,25 @@ public class SeckillOrderSuccessListener implements RocketMQListener<OrderMQResu
         log.info("[订单创建成功消费者] 收到订单创建成功消息：{}", result.toString());
         // 去通知用户下单成功
         Session session = WebSocketServer.SESSION_MAP.get(result.getToken());
-        if (session != null) {
-            // 发送消息给用户
-            try {
-                session.getBasicRemote().sendText(JSON.toJSONString(result));
-            } catch (IOException e) {
-                e.printStackTrace();
+        int count = 0;
+        do {
+            if (session != null) {
+                // 发送消息给用户
+                try {
+                    session.getBasicRemote().sendText(JSON.toJSONString(result));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                break;
+            } else {
+                log.warn("[订单创建成功消费者] 用户{}已经下线，无法进行消息通知...", result.getToken());
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
-        } else {
-            log.warn("[订单创建成功消费者] 用户{}已经下线，无法进行消息通知...", result.getToken());
-        }
+        }while (count++ < 5);
         log.info("[订单创建成功消费者] 订单创建成功消息消费结束--------------");
     }
 }
