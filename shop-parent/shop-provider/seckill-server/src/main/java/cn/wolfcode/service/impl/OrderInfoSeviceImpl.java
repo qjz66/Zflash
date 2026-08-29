@@ -237,36 +237,82 @@ public class OrderInfoSeviceImpl implements IOrderInfoService {
 
     @Override
     public void refund(String orderNo) {
+//        OrderInfo orderInfo = this.findById(orderNo);
+//        /* 查不到订单对象，或者订单状态不是已付款状态，都提示出错 */
+//        if (orderInfo == null || !OrderInfo.STATUS_ACCOUNT_PAID.equals(orderInfo.getStatus())) {
+//            throw new BusinessException(SeckillCodeMsg.OP_ERROR);
+//        }
+//
+//        // 1. 判断订单的支付类型
+//        if (OrderInfo.PAY_TYPE_ONLINE.equals(orderInfo.getPayType())) {
+//            log.info("[退款操作] 准备进行支付宝退款业务：{}", orderInfo.toString());
+//            // 2. 如果是线上支付，就远程调用支付宝接口来进行退款
+//            String reason = "用户自主退款";
+//            RefundVo vo = new RefundVo();
+//            vo.setOutTradeNo(orderNo);
+//            vo.setRefundAmount(orderInfo.getSeckillPrice() + "");
+//            vo.setRefundReason(reason);
+//            Result<Boolean> result = alipayFeignApi.refund(vo);
+//            if (result == null || result.hasError() || !result.getData()) {
+//                // 退款失败
+//                throw new BusinessException(SeckillCodeMsg.REFUND_ERROR);
+//            }
+//            // 2.1 退款成功还需要修改订单状态为已退款、追加退款记录
+//            orderInfoMapper.changeRefundStatus(orderNo, OrderInfo.STATUS_REFUND);
+//            // 追加退款记录
+//            this.addRefundLog(orderInfo, reason);
+//            // 2.2 如果支付宝退款成功，回补库存（数据库库存、库存预减、vo 库存）、本地标识
+//            this.stockCountRollback(orderInfo.getSeckillId(), orderInfo.getSeckillTime(), orderInfo.getUserId());
+//        } else if (OrderInfo.PAY_TYPE_INTERGRAL.equals(orderInfo.getPayType())) {
+//            log.info("[退款操作] 准备进行积分退款业务：{}", orderInfo.toString());
+//            // 3. 如果是积分支付，就调用积分服务进行退款
+//        }
+
+        // 1.查询订单对象 检查订单是否存在
         OrderInfo orderInfo = this.findById(orderNo);
-        /* 查不到订单对象，或者订单状态不是已付款状态，都提示出错 */
-        if (orderInfo == null || !OrderInfo.STATUS_ACCOUNT_PAID.equals(orderInfo.getStatus())) {
-            throw new BusinessException(SeckillCodeMsg.OP_ERROR);
+        if (orderInfo == null) {
+            throw new BusinessException(new CodeMsg(500601, "[退款]查询订单失败..."));
         }
 
-        // 1. 判断订单的支付类型
-        if (OrderInfo.PAY_TYPE_ONLINE.equals(orderInfo.getPayType())) {
+        //判断订单是否为已支付 未支付直接退出
+        if (!OrderInfo.STATUS_ACCOUNT_PAID.equals(orderInfo.getStatus())) {
+            throw new BusinessException(SeckillCodeMsg.REFUND_ERROR);
+        }
+
+        // 2.根据支付类型 判断调哪个退款接口
+        if (orderInfo.getPayType() == OrderInfo.PAY_TYPE_ONLINE) {
+            // 现金支付
             log.info("[退款操作] 准备进行支付宝退款业务：{}", orderInfo.toString());
-            // 2. 如果是线上支付，就远程调用支付宝接口来进行退款
+
+            // 封装请求对象
+            RefundVo refundVo = new RefundVo();
+            refundVo.setOutTradeNo(orderNo);
+            refundVo.setRefundAmount(orderInfo.getSeckillPrice().toString());
             String reason = "用户自主退款";
-            RefundVo vo = new RefundVo();
-            vo.setOutTradeNo(orderNo);
-            vo.setRefundAmount(orderInfo.getSeckillPrice() + "");
-            vo.setRefundReason(reason);
-            Result<Boolean> result = alipayFeignApi.refund(vo);
+            refundVo.setRefundReason(reason);
+
+            Result<Boolean> result = alipayFeignApi.refund(refundVo);
             if (result == null || result.hasError() || !result.getData()) {
-                // 退款失败
                 throw new BusinessException(SeckillCodeMsg.REFUND_ERROR);
             }
-            // 2.1 退款成功还需要修改订单状态为已退款、追加退款记录
-            orderInfoMapper.changeRefundStatus(orderNo, OrderInfo.STATUS_REFUND);
-            // 追加退款记录
-            this.addRefundLog(orderInfo, reason);
-            // 2.2 如果支付宝退款成功，回补库存（数据库库存、库存预减、vo 库存）、本地标识
-            this.stockCountRollback(orderInfo.getSeckillId(), orderInfo.getSeckillTime(), orderInfo.getUserId());
-        } else if (OrderInfo.PAY_TYPE_INTERGRAL.equals(orderInfo.getPayType())) {
-            log.info("[退款操作] 准备进行积分退款业务：{}", orderInfo.toString());
-            // 3. 如果是积分支付，就调用积分服务进行退款
+            // 发送请求
+            // 判断请求是否失败
+        }else {
+            // 积分支付
         }
+
+        //退款成功回滚数据库 redis缓存 售完标识 用户重复购买标识
+        this.stockCountRollback(orderInfo.getSeckillId(), orderInfo.getSeckillTime(), orderInfo.getUserId());
+
+        //创建退款日志记录
+        RefundLog refundLog = new RefundLog();
+        refundLog.setRefundReason("用户申请退款:" + orderInfo.getProductName());
+        refundLog.setRefundAmount(orderInfo.getSeckillPrice().toString());
+        refundLog.setRefundType(orderInfo.getPayType());
+        refundLog.setRefundTime(new Date());
+        refundLog.setOutTradeNo(orderNo);
+
+        refundLogMapper.insert(refundLog);
     }
 
     @Override

@@ -5,6 +5,7 @@ import cn.wolfcode.common.web.Result;
 import cn.wolfcode.config.AlipayProperties;
 import cn.wolfcode.domain.PaySuccessVo;
 import cn.wolfcode.domain.PayVo;
+import cn.wolfcode.domain.RefundVo;
 import cn.wolfcode.feign.AliPaySuccessApi;
 import cn.wolfcode.web.msg.PayCodeMsg;
 import com.alibaba.fastjson.JSONObject;
@@ -249,5 +250,11 @@ public class AlipayController {
         }
 
         return "fail";
+    }
+
+    @PostMapping("/refund")
+    public Result<Boolean> refund(@RequestBody RefundVo refundVo) {
+
+        return null;
     }
 }
