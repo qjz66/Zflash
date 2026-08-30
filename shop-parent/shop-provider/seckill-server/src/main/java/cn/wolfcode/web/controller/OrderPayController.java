@@ -73,12 +73,17 @@ public class OrderPayController {
     public Result<String> dopay(String orderNo, Integer payType) {
         if (Objects.equals(payType, OrderInfo.PAY_TYPE_ONLINE)) {
             return Result.success(orderInfoService.alipay(orderNo));
+        }else if (OrderInfo.PAY_TYPE_INTERGRAL.equals(payType)) {
+            // 积分支付
+            orderInfoService.intergralPay(orderNo);
+            return Result.success("积分支付成功");
         }
         return null;
     }
 
     @PostMapping("paySuccess")
     public Result<String> paySuccess(@RequestBody PaySuccessVo paySuccessVo) {
+        log.info("[支付宝支付成功]改变订单状态");
         orderInfoService.paySuccess(paySuccessVo.getTotalAmount(), paySuccessVo.getTradeNo(), paySuccessVo.getOutTradeNo());
         return Result.success("success");
     }

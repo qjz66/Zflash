@@ -13,7 +13,9 @@ import com.alipay.api.AlipayApiException;
 import com.alipay.api.AlipayClient;
 import com.alipay.api.internal.util.AlipaySignature;
 import com.alipay.api.request.AlipayTradePagePayRequest;
+import com.alipay.api.request.AlipayTradeRefundRequest;
 import com.alipay.api.response.AlipayTradePagePayResponse;
+import com.alipay.api.response.AlipayTradeRefundResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -193,6 +195,7 @@ public class AlipayController {
                     //退款日期超过可退款期限后（如三个月可退款），支付宝系统发送该交易状态通知
                 } else if (trade_status.equals("TRADE_SUCCESS")) {
                     //判断该笔订单是否在商户网站中已经做过处理
+                    log.info("[支付宝异步回调] 收到已支付成功消息，开始回调...");
                     //如果没有做过处理，根据订单号（out_trade_no）在商户网站的订单系统中查到该笔订单的详细，并执行商户的业务程序
                     //如果有做过处理，不执行商户的业务程序
                     PaySuccessVo paySuccessVo = new PaySuccessVo();
@@ -253,8 +256,35 @@ public class AlipayController {
     }
 
     @PostMapping("/refund")
-    public Result<Boolean> refund(@RequestBody RefundVo refundVo) {
+    public Result<Boolean> refund(@RequestBody RefundVo refundVo) throws AlipayApiException {
 
-        return null;
+        AlipayTradeRefundRequest alipayRequest = new AlipayTradeRefundRequest();
+        //商户订单号，商户网站订单系统中唯一订单号
+        String out_trade_no = refundVo.getOutTradeNo();
+        //支付宝交易号
+        String trade_no = "";
+        //请二选一设置
+        //需要退款的金额，该金额不能大于订单金额，必填
+        String refund_amount = refundVo.getRefundAmount();
+        //退款的原因说明
+        String refund_reason = refundVo.getRefundReason();
+        //标识一次退款请求，同一笔交易多次退款需要保证唯一，如需部分退款，则此参数必传
+        String out_request_no = "";
+
+        alipayRequest.setBizContent("{\"out_trade_no\":\"" + out_trade_no + "\","
+                + "\"trade_no\":\"" + trade_no + "\","
+                + "\"refund_amount\":\"" + refund_amount + "\","
+                + "\"refund_reason\":\"" + refund_reason + "\","
+                + "\"out_request_no\":\"" + out_request_no + "\"}");
+
+        //请求
+        try {
+            AlipayTradeRefundResponse response = alipayClient.execute(alipayRequest);
+            log.info("[支付宝退款] 收到支付宝退款响应信息：{}", response.getBody());
+            return Result.success(response.isSuccess());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return Result.error(new CodeMsg(500601,"[支付宝退款] 退款失败..."));
     }
 }

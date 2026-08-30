@@ -304,6 +304,8 @@ public class OrderInfoSeviceImpl implements IOrderInfoService {
         //退款成功回滚数据库 redis缓存 售完标识 用户重复购买标识
         this.stockCountRollback(orderInfo.getSeckillId(), orderInfo.getSeckillTime(), orderInfo.getUserId());
 
+        orderInfoMapper.changeRefundStatus(orderNo, OrderInfo.STATUS_REFUND);
+
         //创建退款日志记录
         RefundLog refundLog = new RefundLog();
         refundLog.setRefundReason("用户申请退款:" + orderInfo.getProductName());
@@ -357,7 +359,7 @@ public class OrderInfoSeviceImpl implements IOrderInfoService {
             throw new BusinessException(SeckillCodeMsg.INTERGRAL_PAY_FAILED_ERROR);
         }
         // 7. 增加积分支付日志
-        this.addPayLog(orderNo, OrderInfo.PAY_TYPE_ONLINE, orderInfo.getIntergral() + "", "-1");
+        this.addPayLog(orderNo, OrderInfo.PAY_TYPE_INTERGRAL, orderInfo.getIntergral() + "", "-1");
         // 8. 调用积分服务扣除用户积分，增加积分扣除日志
         // intergralFeignApi.decrIntergral(orderInfo.getUserId(), orderInfo.getIntergral(), orderNo);
         OperateIntergralVo vo = new OperateIntergralVo();
