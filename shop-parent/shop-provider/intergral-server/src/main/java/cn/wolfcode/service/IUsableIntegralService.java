@@ -1,6 +1,7 @@
 package cn.wolfcode.service;
 
 import cn.wolfcode.domain.OperateIntergralVo;
+import cn.wolfcode.domain.RefundVo;
 import cn.wolfcode.domain.UsableIntegral;
 import io.seata.rm.tcc.api.BusinessActionContext;
 import io.seata.rm.tcc.api.BusinessActionContextParameter;
@@ -42,4 +43,6 @@ public interface IUsableIntegralService {
      * @param context
      */
     void decrIntegralRollback(BusinessActionContext context);
+
+    Boolean doRefund(RefundVo refundVo);
 }

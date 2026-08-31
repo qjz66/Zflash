@@ -21,11 +21,15 @@ import com.alibaba.fastjson.JSON;
 import io.seata.core.context.RootContext;
 import io.seata.spring.annotation.GlobalTransactional;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.rocketmq.client.producer.LocalTransactionState;
+import org.apache.rocketmq.client.producer.TransactionSendResult;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -279,17 +283,17 @@ public class OrderInfoSeviceImpl implements IOrderInfoService {
             throw new BusinessException(SeckillCodeMsg.REFUND_ERROR);
         }
 
+        // 封装请求对象
+        RefundVo refundVo = new RefundVo();
+        refundVo.setOutTradeNo(orderNo);
+        refundVo.setRefundAmount(orderInfo.getSeckillPrice().toString());
+        String reason = "用户自主退款";
+        refundVo.setRefundReason(reason);
+
         // 2.根据支付类型 判断调哪个退款接口
         if (orderInfo.getPayType() == OrderInfo.PAY_TYPE_ONLINE) {
             // 现金支付
             log.info("[退款操作] 准备进行支付宝退款业务：{}", orderInfo.toString());
-
-            // 封装请求对象
-            RefundVo refundVo = new RefundVo();
-            refundVo.setOutTradeNo(orderNo);
-            refundVo.setRefundAmount(orderInfo.getSeckillPrice().toString());
-            String reason = "用户自主退款";
-            refundVo.setRefundReason(reason);
 
             Result<Boolean> result = alipayFeignApi.refund(refundVo);
             if (result == null || result.hasError() || !result.getData()) {
@@ -298,13 +302,25 @@ public class OrderInfoSeviceImpl implements IOrderInfoService {
             // 发送请求
             // 判断请求是否失败
         }else {
-            // 积分支付
+            // 积分支付退款 发起分布式事务消息
+            Message<RefundVo> message =  MessageBuilder.withPayload(refundVo).setHeader("orderNo",orderNo).build();
+            TransactionSendResult res = rocketMQTemplate.sendMessageInTransaction(MQConstant.INTEGRAL_REFUND_TX_GROUP, MQConstant.INTEGRAL_REFUND_TX_TOPIC, message, orderNo);
+            if (LocalTransactionState.COMMIT_MESSAGE.equals(res.getLocalTransactionState())) {
+                log.info("[积分退款]:积分退款成功");
+                return;
+            }
+
+            throw new BusinessException(SeckillCodeMsg.REFUND_ERROR);
         }
 
+        this.refundRollBack(orderInfo);
+    }
+
+    private void refundRollBack(OrderInfo orderInfo) {
         //退款成功回滚数据库 redis缓存 售完标识 用户重复购买标识
         this.stockCountRollback(orderInfo.getSeckillId(), orderInfo.getSeckillTime(), orderInfo.getUserId());
 
-        orderInfoMapper.changeRefundStatus(orderNo, OrderInfo.STATUS_REFUND);
+        orderInfoMapper.changeRefundStatus(orderInfo.getOrderNo(), OrderInfo.STATUS_REFUND);
 
         //创建退款日志记录
         RefundLog refundLog = new RefundLog();
@@ -312,7 +328,7 @@ public class OrderInfoSeviceImpl implements IOrderInfoService {
         refundLog.setRefundAmount(orderInfo.getSeckillPrice().toString());
         refundLog.setRefundType(orderInfo.getPayType());
         refundLog.setRefundTime(new Date());
-        refundLog.setOutTradeNo(orderNo);
+        refundLog.setOutTradeNo(orderInfo.getOrderNo());
 
         refundLogMapper.insert(refundLog);
     }
@@ -376,6 +392,17 @@ public class OrderInfoSeviceImpl implements IOrderInfoService {
     @Override
     public OrderInfo selectByUserIdAndSecKillId(Long phone, Long seckillId) {
         return orderInfoMapper.selectByUserIdAndSecKillId(phone,seckillId);
+    }
+
+    @Override
+    public void IntergralRefundRollback(String orderNo) {
+        OrderInfo orderInfo = orderInfoMapper.find(orderNo);
+        this.refundRollBack(orderInfo);
+    }
+
+    @Override
+    public RefundLog SelectRefundLogByOrderNo(String orderNo) {
+        return refundLogMapper.selectByOrderNo(orderNo);
     }
 
     private void addRefundLog(OrderInfo orderInfo, String reason) {

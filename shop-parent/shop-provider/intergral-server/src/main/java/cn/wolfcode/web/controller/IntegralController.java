@@ -2,10 +2,12 @@ package cn.wolfcode.web.controller;
 
 import cn.wolfcode.common.web.Result;
 import cn.wolfcode.domain.OperateIntergralVo;
+import cn.wolfcode.domain.RefundVo;
 import cn.wolfcode.domain.UsableIntegral;
 import cn.wolfcode.service.IUsableIntegralService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,6 +36,13 @@ public class IntegralController {
         // 调用方法
         usableIntegralService.decrIntegralTry(vo, null);
         return Result.success(true);
+    }
+    
+    @RequestMapping("/refund")
+    public Result<Boolean> refund(@RequestBody RefundVo refundVo) {
+        log.info("[积分退款]积分退款开始...");
+        Boolean res = usableIntegralService.doRefund(refundVo);
+        return Result.success(res);
     }
 
     private OperateIntergralVo toIntegralVo(Long userId, Long integral, String orderNo) {

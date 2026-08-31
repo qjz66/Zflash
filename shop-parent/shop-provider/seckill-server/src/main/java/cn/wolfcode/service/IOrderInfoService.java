@@ -3,6 +3,7 @@ package cn.wolfcode.service;
 
 import cn.wolfcode.common.domain.UserInfo;
 import cn.wolfcode.domain.OrderInfo;
+import cn.wolfcode.domain.RefundLog;
 import cn.wolfcode.domain.SeckillProductVo;
 import cn.wolfcode.mq.TimeoutOrder;
 import org.springframework.transaction.annotation.Transactional;
@@ -82,4 +83,7 @@ public interface IOrderInfoService {
 
     OrderInfo selectByUserIdAndSecKillId(Long phone, Long seckillId);
 
+    void IntergralRefundRollback(String orderNo);
+
+    RefundLog SelectRefundLogByOrderNo(String orderNo);
 }

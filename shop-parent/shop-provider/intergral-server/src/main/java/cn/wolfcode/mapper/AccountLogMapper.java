@@ -9,4 +9,6 @@ public interface AccountLogMapper {
      * @param accountLog
      */
     void insert(AccountLog accountLog);
+
+    AccountLog selectByOutTradeNoAndType(String outTradeNo, int typeDecr);
 }

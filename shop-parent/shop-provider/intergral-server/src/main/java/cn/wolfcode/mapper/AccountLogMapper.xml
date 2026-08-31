@@ -7,5 +7,9 @@
     values
     (#{pkValue},#{type},#{amount},now(),#{info})
   </insert>
+    <select id="selectByOutTradeNoAndType" resultType="cn.wolfcode.domain.AccountLog">
+      select pk_value,type,amount,gmt_time,info from t_account_log
+      where pk
+    </select>
 
 </mapper>

@@ -1,6 +1,7 @@
 package cn.wolfcode.feign.fallback;
 
 import cn.wolfcode.common.web.Result;
+import cn.wolfcode.domain.RefundVo;
 import cn.wolfcode.feign.IntergralFeignApi;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -18,6 +19,12 @@ public class IntergralFeignFallback implements IntergralFeignApi {
     @Override
     public Result<Boolean> decrIntergral(Long userId, Long intergral, String orderNo) {
         log.warn("[积分降级服务] 积分支付扣减用户积分是啊比：userId={}, intergral={}, orderNo={}", userId, intergral, orderNo);
+        return Result.success(false);
+    }
+
+    @Override
+    public Result<Boolean> refund(RefundVo refundVo) {
+        log.warn("[积分降级服务] ");
         return Result.success(false);
     }
 }

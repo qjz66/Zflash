@@ -1,10 +1,7 @@
 package cn.wolfcode.service.impl;
 
 import cn.wolfcode.common.exception.BusinessException;
-import cn.wolfcode.domain.AccountLog;
-import cn.wolfcode.domain.AccountTransaction;
-import cn.wolfcode.domain.OperateIntergralVo;
-import cn.wolfcode.domain.UsableIntegral;
+import cn.wolfcode.domain.*;
 import cn.wolfcode.mapper.AccountLogMapper;
 import cn.wolfcode.mapper.AccountTransactionMapper;
 import cn.wolfcode.mapper.UsableIntegralMapper;
@@ -141,6 +138,15 @@ public class UsableIntegralServiceImpl implements IUsableIntegralService {
                 throw new BusinessException(IntergralCodeMsg.OP_INTERGRAL_ERROR);
             }
         }
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public Boolean doRefund(RefundVo refundVo) {
+        // 1.基于订单编号查询支付流水 类型必须为扣款
+        AccountLog accountLog = accountLogMapper.selectByOutTradeNoAndType(refundVo.getOutTradeNo(), AccountLog.TYPE_DECR);
+        // 2.如果类型为扣款进行退款
+        return null;
     }
 
 

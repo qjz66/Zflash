@@ -24,4 +24,9 @@ public class MQConstant {
 
     //延迟消息等级
     public static final int ORDER_PAY_TIMEOUT_DELAY_LEVEL = 16;
+
+    // 积分退款分组
+    public static final String INTEGRAL_REFUND_TX_GROUP = "INTEGRAL_REFUND_TX_GROUP";
+    // 积分退款topic
+    public static final String INTEGRAL_REFUND_TX_TOPIC = "INTEGRAL_REFUND_TX_TOPIC";
 }
