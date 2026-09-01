@@ -2,3 +2,6 @@
 target/
 .idea/
 *.txt
+frontend-server/react/node_modules/
+frontend-server/react/dist/
+.pnpm-store/

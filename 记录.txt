@@ -40,3 +40,11 @@ RocketMQ进行异步创建订单操作，使用websocket进行订单内容推送
 使用基本RocketMQ的分布式事务消息完成积分退款：1.将消息发送给MQ，本地起一个MQ事务监听器，监听到本地事务消息后消费，根据事务是否完成返回commit/roolback
 2.远程服务监听同一个MQ事务队列，MQ服务器会根据返回commit/roolback处理half message，如果为commit则提交给远程服务进行消费
 3.该方法不保证远程事务的执行结果，所以适用于本地事务需要校验，远程事务必定成功的场景
+
+MySQL主从备份原理
+1. 主节点存bin-log bin-log中是binary-log-events 记录了主节点所有写操作
+2. 从节点发起dump请求，主节点将bin-log发给从节点，从节点存在relay log中
+3. 从节点重放relay log的内容
+
+canal原理
+伪装成从节点，发送dump请求，获取bin-log后解析对象
