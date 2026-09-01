@@ -352,10 +352,49 @@ public class OrderInfoSeviceImpl implements IOrderInfoService {
         }
     }
 
+
+
     /* TM 标识开始事物的地方 */
     @GlobalTransactional(rollbackFor = Exception.class)
     @Override
     public void intergralPay(String orderNo) {
+        // 1. 根据订单编号 + 状态查询订单信息
+        OrderInfo orderInfo = this.findById(orderNo);
+        // 2. 判断订单是否能查询到，如果查询不到，说明订单状态异常
+        if (orderInfo == null || !OrderInfo.STATUS_ARREARAGE.equals(orderInfo.getStatus())) {
+            throw new BusinessException(SeckillCodeMsg.INTERGRAL_SERVER_ERROR);
+        }
+        // 3. 基于用户id + 订单所需积分查询积分服务，获取用户积分信息
+        Result<Boolean> intergralResult = intergralFeignApi.findIntergralByUserIdForPay(orderInfo.getUserId(), orderInfo.getIntergral());
+        // 4. 判断用户积分是否能获取到，如果获取不到，直接提示积分不足
+        if (intergralResult == null || intergralResult.hasError() || !intergralResult.getData()) {
+            throw new BusinessException(SeckillCodeMsg.INTERGRAL_SERVER_ERROR);
+        }
+        // 5. 修改订单状态为已支付
+        // 6. 修改订单支付类型为积分支付，并设置支付时间
+        int row = orderInfoMapper.changePayStatus(orderNo, OrderInfo.STATUS_ACCOUNT_PAID, OrderInfo.PAY_TYPE_INTERGRAL);
+        if (row == 0) {
+            throw new BusinessException(SeckillCodeMsg.INTERGRAL_PAY_FAILED_ERROR);
+        }
+        // 7. 增加积分支付日志
+        this.addPayLog(orderNo, OrderInfo.PAY_TYPE_INTERGRAL, orderInfo.getIntergral() + "", "-1");
+        // 8. 调用积分服务扣除用户积分，增加积分扣除日志
+        // intergralFeignApi.decrIntergral(orderInfo.getUserId(), orderInfo.getIntergral(), orderNo);
+        OperateIntergralVo vo = new OperateIntergralVo();
+        vo.setInfo(RootContext.getXID());
+        vo.setPk(orderNo);
+        vo.setUserId(orderInfo.getUserId());
+        vo.setValue(orderInfo.getIntergral());
+        // 通过发送异步消息扣除积分
+        intergralFeignApi.decrIntergral(orderInfo.getUserId(), orderInfo.getIntergral(), orderNo);
+//        rocketMQTemplate.asyncSend(MQConstant.INTEGRAL_PAY_TOPIC, vo,
+//                new SeckillPendingOrderMessageListener.SendResultMessageCallback(vo.toString()));
+    }
+
+    /* TM 标识开始事物的地方 */
+    @GlobalTransactional(rollbackFor = Exception.class)
+
+    public void intergralPay1(String orderNo) {
         // 1. 根据订单编号 + 状态查询订单信息
         OrderInfo orderInfo = this.findById(orderNo);
         // 2. 判断订单是否能查询到，如果查询不到，说明订单状态异常
