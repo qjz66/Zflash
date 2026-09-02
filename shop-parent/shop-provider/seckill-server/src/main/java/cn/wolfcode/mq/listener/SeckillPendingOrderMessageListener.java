@@ -3,11 +3,13 @@ package cn.wolfcode.mq.listener;
 import cn.wolfcode.common.exception.BusinessException;
 import cn.wolfcode.common.web.CodeMsg;
 import cn.wolfcode.common.web.Result;
+import cn.wolfcode.mapper.OrderInfoMapper;
 import cn.wolfcode.mq.MQConstant;
 import cn.wolfcode.mq.OrderMQResult;
 import cn.wolfcode.mq.OrderMessage;
 import cn.wolfcode.mq.TimeoutOrder;
 import cn.wolfcode.service.IOrderInfoService;
+import cn.wolfcode.web.msg.SeckillCodeMsg;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.client.producer.SendCallback;
 import org.apache.rocketmq.client.producer.SendResult;
@@ -32,6 +34,8 @@ public class SeckillPendingOrderMessageListener implements RocketMQListener<Orde
     private IOrderInfoService orderInfoService;
     @Autowired
     private RocketMQTemplate rocketMQTemplate;
+    @Autowired
+    private OrderInfoMapper orderInfoMapper;
 
     @Override
     public void onMessage(OrderMessage orderMessage) {
@@ -42,6 +46,10 @@ public class SeckillPendingOrderMessageListener implements RocketMQListener<Orde
             log.info("[秒杀订单消费者] 收到秒杀订单前置消息：{}", orderMessage.toString());
             log.info("[秒杀订单消费者] 准备开始创建订单-------------------------------------------");
             // 调用秒杀订单服务直接创建秒杀订单
+            // 查询MySQL中是否已有该订单，如果没有则进行创建
+            if(orderInfoMapper.selectByUserIdAndSecKillId(orderMessage.getUserPhone(), orderMessage.getSeckillId()) != null) {
+                throw new BusinessException(SeckillCodeMsg.SECKILL_ERROR);
+            }
             String orderNo = orderInfoService.doSeckill(orderMessage.getTime(), orderMessage.getSeckillId(), orderMessage.getUserPhone());
             log.info("[秒杀订单消费者] 订单编号：{}", orderNo);
             log.info("[秒杀订单消费者] 创建订单完成-------------------------------------------");
